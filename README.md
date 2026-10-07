@@ -1,10 +1,25 @@
-# Notes API
+# donmir_notes_api
 
-A simple HTTP service providing a basic notes API and health checks.
+## What it does
+A small HTTP service written in Python (standard library only, no
+dependencies). It exposes three endpoints:
 
-## Port Configuration
-The application reads the port from the `$PORT` environment variable (defaults to `8080` if not set).
+- `GET /` returns a welcome message
+- `GET /healthz` returns `OK` with status 200 when the service is up
+- `GET /notes` returns a JSON list of notes (`id` and `title`)
 
-## How to Run
+Any other path returns 404. The notes list is currently static.
+
+## How to run
 ```bash
 ./scripts/run.sh
+```
+The server listens on the port from the `PORT` environment variable
+(default 8080), for example `PORT=9000 ./scripts/run.sh`.
+
+## How to test
+```bash
+./scripts/test.sh
+```
+The tests start the application and check that `/healthz` returns 200
+and that `/notes` returns the expected JSON.
