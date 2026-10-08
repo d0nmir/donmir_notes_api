@@ -11,6 +11,7 @@ dependencies). It exposes three endpoints:
 Any other path returns 404. The notes list is currently static.
 
 ## How to run
+
 ```bash
 ./scripts/run.sh
 ```
