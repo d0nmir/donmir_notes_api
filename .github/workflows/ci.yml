@@ -1,20 +1,26 @@
 name: CI
+
 on:
   push:
     branches: [ main ]
   pull_request:
+
 permissions:
   contents: read
+
 defaults:
   run:
     shell: bash
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   test:
     name: Run tests
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
         with:
