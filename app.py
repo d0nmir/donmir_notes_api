@@ -2,13 +2,16 @@ import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 
+GREETING = os.environ.get("GREETING", "Hello!")
+
+
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
             self.send_response(200)
             self.send_header('Content-Type', 'text/plain; charset=utf-8')
             self.end_headers()
-            self.wfile.write(b"Hello! Welcome to Notes API.")
+            self.wfile.write(f"{GREETING} Welcome to Notes API.".encode("utf-8"))
             
         elif self.path == '/healthz':
             self.send_response(200)
