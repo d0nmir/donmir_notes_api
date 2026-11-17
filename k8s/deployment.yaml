@@ -17,7 +17,7 @@ spec:
         runAsUser: 10001
       containers:
         - name: notes
-          image: ghcr.io/d0nmir/donmir_notes_api:7b94bea1decae4bdbd8bd1d19d60db07d8efb86d
+          image: ghcr.io/d0nmir/donmir_notes_api:c8ceb1b4732f35115de7f5ea4271ffd5daf1cd23
           envFrom:
             - configMapRef:
                 name: notes-config
