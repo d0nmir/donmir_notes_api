@@ -26,46 +26,67 @@ jobs:
     name: mark_m5.py --kind
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-          fetch-depth: 0      # the marker reads the whole history (credentials, the image bump)
-          # The commit you pushed, not GitHub's preview merge: Argo CD must be able to fetch it.
+          fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Install kind, kubectl and helm - pinned versions, checksums checked
+      - name: Install kind, kubectl and Helm
         env:
           KIND_VERSION: v0.33.0
           KIND_SHA256: aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d
           KUBECTL_VERSION: v1.37.1
           KUBECTL_SHA512: decde4d990d0fbf6451e65524dec42c549de3339f27005c45af8d3c61cca1de852524ebf2215c82be86d4ab2621c823f56f718b8d2c304b9100a903e696c0c32
-          HELM_VERSION: v4.2.1          # the Helm inside Argo CD 3.5.3
+          HELM_VERSION: v4.2.1
           HELM_SHA256: 479dca836e5b45e8bd222400c5591b0e3a647378f03ff96597180db97c17fdae
         run: |
-          curl -fsSLo kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+          cd "$RUNNER_TEMP"
+
+          curl -fsSL --retry 3 -o kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
           echo "${KIND_SHA256}  kind" | sha256sum -c -
-          curl -fsSLO "https://dl.k8s.io/${KUBECTL_VERSION}/kubernetes-client-linux-amd64.tar.gz"
+
+          curl -fsSLO --retry 3 "https://dl.k8s.io/${KUBECTL_VERSION}/kubernetes-client-linux-amd64.tar.gz"
           echo "${KUBECTL_SHA512}  kubernetes-client-linux-amd64.tar.gz" | sha512sum -c -
           tar -xzf kubernetes-client-linux-amd64.tar.gz kubernetes/client/bin/kubectl
-          curl -fsSLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+
+          curl -fsSLO --retry 3 "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
           echo "${HELM_SHA256}  helm-${HELM_VERSION}-linux-amd64.tar.gz" | sha256sum -c -
           tar -xzf "helm-${HELM_VERSION}-linux-amd64.tar.gz" linux-amd64/helm
+
           sudo install -m 0755 kind kubernetes/client/bin/kubectl linux-amd64/helm /usr/local/bin/
 
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
+
       - run: python -m pip install --quiet pyyaml==6.0.3
 
-      - name: Run the M5 marker - static and live
+      - name: Run the M5 marker
         run: |
-          curl -fsSLO https://raw.githubusercontent.com/inf345/inf345-week10-lab/main/mark_m5.py
-          python - <<'EOF'
-          s = open('mark_m5.py').read()
-          old = 'return self.kubectl("wait", "--for", "condition=established", "--timeout=120s",'
-          new = 'return self.kubectl("wait", "--for", \'jsonpath={.status.conditions[?(@.type=="Established")].status}=True\', "--timeout=120s",'
-          assert old in s, "marker changed, patch not needed or outdated"
-          open('mark_m5.py', 'w').write(s.replace(old, new))
-          EOF
-          python mark_m5.py --path . --kind
+          marker="$RUNNER_TEMP/mark_m5.py"
+          curl -fsSL --retry 3 -o "$marker" \
+            https://raw.githubusercontent.com/inf345/inf345-week10-lab/39511e542cc6afe7c6a44c81a881e72e237e0d71/mark_m5.py
+
+          python - "$marker" <<'PYTHON'
+          import sys
+          from pathlib import Path
+
+          marker = Path(sys.argv[1])
+          source = marker.read_text(encoding="utf-8")
+          old = '"wait", "--for", "condition=established", "--timeout=120s",'
+          condition = '.status.conditions[?(@.type=="Established")].status'
+          wait_for = "jsonpath={" + condition + "}=True"
+          new = f'"wait", "--for=create", "--for", {wait_for!r}, "--timeout=120s",'
+
+          if source.count(old) != 1:
+              raise SystemExit("Could not locate the CRD wait in the pinned marker")
+
+          patched = source.replace(old, new, 1)
+          compile(patched, str(marker), "exec")
+          marker.write_text(patched, encoding="utf-8")
+          PYTHON
+
+          python -u "$marker" --path . --kind
