@@ -61,4 +61,11 @@ jobs:
       - name: Run the M5 marker - static and live
         run: |
           curl -fsSLO https://raw.githubusercontent.com/inf345/inf345-week10-lab/main/mark_m5.py
+          python - <<'EOF'
+          s = open('mark_m5.py').read()
+          old = 'return self.kubectl("wait", "--for", "condition=established", "--timeout=120s",'
+          new = 'return self.kubectl("wait", "--for", \'jsonpath={.status.conditions[?(@.type=="Established")].status}=True\', "--timeout=120s",'
+          assert old in s, "marker changed, patch not needed or outdated"
+          open('mark_m5.py', 'w').write(s.replace(old, new))
+          EOF
           python mark_m5.py --path . --kind
